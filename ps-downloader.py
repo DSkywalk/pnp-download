@@ -5,7 +5,7 @@
 """
 ps-downloader.py.
 
-Python library to download PS sites content
+Python library to download Printing sites content
 https://github.com/dskywalk/pnp-download
 
 Copyright (C)  2015 dskywalk - http://david.dantoine.org
@@ -92,7 +92,6 @@ class PrinterStudio(webpnp):
 
     """     setup with ps elements    """
     def setup (self):
-        print "PS Class USED!"
         self.m_needUser = False
         self.m_sLoginUrl = "https://secure.%s/login.aspx"
         self.m_sEditUrl = "http://www.%s/products/pro_project_edit.aspx"
@@ -176,7 +175,6 @@ class PrinterStudio(webpnp):
 
 class XCow(webpnp):
     def setup(self):
-        print "CW Class USED!"
         self.m_needUser = True
         self.m_dHeaderJson = dict(self.m_dHeaders.items() + [('content-type', 'application/json')])
         self.m_sLoginUrl = "https://www.%s/default.aspx/Login"
@@ -188,6 +186,9 @@ class XCow(webpnp):
            }
 
     def prepare_url(self):
+        if not "ShareAlbum" in self.m_sUserUrl:
+            print "ERROR! Only supported ShareAlbum LINKS, sorry..."
+            return "", True
         request = self.m_oSession.get(self.m_sUserUrl, headers=self.m_dHeaders)
         page = BeautifulSoup(request.text)
         form = page.find('form')
@@ -242,7 +243,7 @@ class XCow(webpnp):
 
 if __name__ == '__main__':
     parser = optparse.OptionParser(usage='%prog [options] <url> ',
-                               version='0.1',)
+                               version='0.5',)
     install_opts  = optparse.OptionGroup( parser, 'Download Options',
                                           'These options control downloads.', )
     
@@ -251,10 +252,10 @@ if __name__ == '__main__':
 
     
     install_opts.add_option('--username', action='store', default=False,
-                        help='your printerstudio username/email.')
+                        help='your site username/email.')
     
     install_opts.add_option('--password', action='store', default=False,
-                        help='your printerstudio password.')
+                        help='your site password.')
     
     
     parser.add_option_group(install_opts)
