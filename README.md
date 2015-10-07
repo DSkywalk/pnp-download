@@ -38,7 +38,7 @@ Download cowcow/artscow *public shared* project:
 
     ps-downloader.py "http://www.artscow.com/gallery/card/bit-mini-axacabfmmvzf"
 
-Download cowcow/artscow shared project:
+Download cowcow/artscow shared project, **need a valid user**
 
     ps-downloader.py --username "foo@foo.com" --password "mypass" "http://www.artscow.com/ShareAlbum.aspx?Key=xu08nsid"
 
