@@ -34,6 +34,11 @@ Download protected images from the site, **need a valid user**
 
     ps-downloader.py --username "foo@foo.com" --password "mypass" "http://www.printerstudio.com/products/pro_project_render.aspx?type=BAD7275F80A1BD73&order=E742257CA69120A06303245B264A3D83&id=A09CA5521B949F4396809EB370917E83322B4AE40C3EB279A58217F08BB57FE9E412121432C53FF7"
 
+Download cowcow/artscow *public shared* project:
+
+    ps-downloader.py "http://www.artscow.com/gallery/card/bit-mini-axacabfmmvzf"
+
 Download cowcow/artscow shared project:
 
     ps-downloader.py --username "foo@foo.com" --password "mypass" "http://www.artscow.com/ShareAlbum.aspx?Key=xu08nsid"
+
