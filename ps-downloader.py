@@ -67,11 +67,19 @@ class webpnp:
             
         # finally call setup
         self.setup()
+
+    def is_jpg(self, p_fHeader):
+        if (p_fHeader[:3] == "\xff\xd8\xff"):
+            return True
+        elif (p_fHeader[6:] == 'JFIF\0'):
+            return True
+        else:
+            return False
         
     
     def log_file(self, p_sFile, p_sTxt):
         with open(p_sFile, 'w') as file_:
-            file_.write(p_sTxt.encode('utf-8'))
+            file_.write(p_sTxt)
             file_.close()
 
     def setup(self):
@@ -173,22 +181,20 @@ class PrinterStudio(webpnp):
         self.m_oSession.post(self.m_sLoginUrl % self.m_netloc, data=self.m_dPayload, headers=self.m_dHeaders)
         return True
 
-class XCow(webpnp):
+
+class XCowShared(webpnp):
     def setup(self):
         self.m_needUser = True
         self.m_dHeaderJson = dict(self.m_dHeaders.items() + [('content-type', 'application/json')])
         self.m_sLoginUrl = "https://www.%s/default.aspx/Login"
         self.m_sDinamicUrl = "http://www.%s/SlideShow.aspx?f=Load&folder="
-        self.m_sImageUrl = "http://c2.%s/img/12-" # -0-0-1
+        self.m_sImageUrl = "http://c1.%s/img/12-" # -0-0-1
         self.m_dPayload = {
                 'Email': lOptions.username,
                 'Password': lOptions.password,
            }
 
     def prepare_url(self):
-        if not "ShareAlbum" in self.m_sUserUrl:
-            print "ERROR! Only supported ShareAlbum LINKS, sorry..."
-            return "", True
         request = self.m_oSession.get(self.m_sUserUrl, headers=self.m_dHeaders)
         page = BeautifulSoup(request.text)
         form = page.find('form')
@@ -200,6 +206,7 @@ class XCow(webpnp):
             return "", True
           
         return (self.m_sDinamicUrl % self.m_netloc) + oQuery['folder'][0], False
+
 
     def download(self, p_sURL):
         request = self.m_oSession.get(p_sURL, headers=self.m_dHeaders)
@@ -237,13 +244,80 @@ class XCow(webpnp):
             return False
         return True
 
+
+class XCowDesigner(XCowShared):
+    def setup(self):
+        self.m_needUser = False
+        self.m_dHeaderJson = dict(self.m_dHeaders.items() + [('content-type', 'application/json')])
+        self.m_sLoginUrl = "https://www.%s/default.aspx/Login"
+        self.m_sDinamicUrl = "http://www.%s/ClientDesigner/ClientDesigner.ashx?f=Design&DesignId="
+        self.m_sImageUrl = "http://%s/img/12-" # -0-0-1
+        self.m_dPayload = {
+                'Email': lOptions.username,
+                'Password': lOptions.password,
+           }
+        
+    def prepare_url(self):
+        request = self.m_oSession.get(self.m_sUserUrl)
+        page = BeautifulSoup(request.text)
+        lImages = page.findAll('img')
+        try:
+            for img in lImages:
+                sFile = urlparse(img.get('src')).path[5:]
+                if sFile[:2] == "4-":
+                    sFile = sFile[2:]
+                    return (self.m_sDinamicUrl % self.m_netloc) + sFile[:sFile.index('-')], False
+            
+        except:
+            pass
+        
+        print "ERROR! unknown design, sorry..."
+        return "", True
+
+    def download(self, p_sURL):
+        request = self.m_oSession.get(p_sURL, headers=self.m_dHeaders, stream=True)
+        page = None
+        try:
+            import zipfile, StringIO
+            z=zipfile.ZipFile(StringIO.StringIO(request.raw.read()))
+            page = BeautifulSoup(z.read("1.xml"))
+        except (RuntimeError, zipfile.BadZipfile):
+            print "ERROR! unknown album, sorry..."
+            return
+
+        lInfo = page.find('alldesign')
+        sCacheServer = lInfo.get('cacheserver')
+        lImages = page.findAll('imagedesign')
+        lImages = set([x.get('filesystemid') for x in lImages ]) #get id and remove duplicated using a set
+        TotalImages = len(lImages)
+        print " Downloading: " + str(TotalImages) + " images from " + sCacheServer
+        iCounter = 0
+
+        import imghdr
+        for imgId in lImages:
+            sFile = imgId
+            sUrl = (self.m_sImageUrl % sCacheServer) + sFile + "-0-0-1"
+            sExt = ".jpg"
+            print "d: " + sFile
+            rImg = self.m_oSession.get(sUrl, headers=self.m_dHeaders, stream=True)
+            # print rImg.headers # siempre manda que es jpeg, no valen de nada las cabeceras...
+            fData = rImg.raw.read()
+            sExt = imghdr.what("", fData[:32]) # only need first 32 bytes (header) to get image type
+            if self.m_sFilenameCustom:
+                sFile = self.m_sFilenameCustom + "_" + "{0:04d}".format(iCounter)
+                iCounter += 1
+                
+            with open(sFile + "." + sExt, 'wb') as file_:
+                file_.write(fData)
+                file_.close()
+
 """
 ****  MAIN 
 """
 
 if __name__ == '__main__':
     parser = optparse.OptionParser(usage='%prog [options] <url> ',
-                               version='0.5',)
+                               version='0.6',)
     install_opts  = optparse.OptionGroup( parser, 'Download Options',
                                           'These options control downloads.', )
     
@@ -268,19 +342,24 @@ if __name__ == '__main__':
     oWeb = None
     if "printerstudio" in lArgs[0]:
         oWeb = PrinterStudio(lArgs[0])
+    elif not "ShareAlbum" in lArgs[0]:
+        oWeb = XCowDesigner(lArgs[0])
     else:
-        oWeb = XCow(lArgs[0])
+        oWeb = XCowShared(lArgs[0])
 
     userLogged = False
     if lOptions.username and lOptions.password:
+        print "Login..."
         userLogged = oWeb.login()
+    else:
+        print " "
 
-    if not oWeb.m_needUser:
-        print " Warning, you are not logged. Some LINKS could not work ..."
-    elif not userLogged:
-        print "ERROR! This site needs a correct user/pass."
-        sys.exit(0)
-        
+    if not userLogged:
+        if not oWeb.m_needUser:
+            print " Warning, you are not logged. Some LINKS could not work ..."
+        else:
+            print "ERROR! This site needs a correct user/pass."
+            sys.exit(0)
 
     print "Getting URL..."
     sUrl, bError = oWeb.prepare_url()
