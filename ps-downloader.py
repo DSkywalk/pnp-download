@@ -77,6 +77,11 @@ class webpnp:
             return False
         
     
+    def clean_filename(self, value):
+        for c in '\/:*?"<>|':
+            value = value.replace(c,'')
+        return value.encode('ascii',errors='ignore') # force remove special chars
+
     def log_file(self, p_sFile, p_sTxt):
         with open(p_sFile, 'w') as file_:
             file_.write(p_sTxt)
@@ -220,19 +225,28 @@ class XCowShared(webpnp):
             print "ERROR! Images not found at " + p_sURL
             print " "
         
-        print " Downloading: " + str(TotalImages) + " images."
+        print " Downloading: " + str(TotalImages - 1) + " images."
         iCounter = 0
         for img in lImages[1:]: # first is project info, no need it atm
             lImgData = img.split(',')
-            # print lImgData 
-            sFile = lImgData[1]
+            if len(lImgData) < 4:
+                continue
+
             sUrl = (self.m_sImageUrl % self.m_netloc) + lImgData[0] + "-0-0-1"
-            print "d: " + sFile
             if self.m_sFilenameCustom:
-                sFile = self.m_sFilenameCustom + "_" + "{0:04d}".format(iCounter) + "." + sFile[-3:]
+                sFile = self.m_sFilenameCustom + "_" + "{0:04d}".format(iCounter) + "." + lImgData[1][-3:]
                 iCounter += 1
-                
-            urllib.urlretrieve (sUrl, sFile)
+                print "d: " + sFile
+                urllib.urlretrieve (sUrl, sFile)
+            else:
+                try:
+                    sFile = lImgData[1]
+                    urllib.urlretrieve (sUrl, sFile)
+                    print "d: " + sFile
+                except IOError: # avoid malformed filenames
+                    sFile = self.clean_filename(lImgData[1])
+                    print "d: " + sFile + " (cleaned filename)"
+                    urllib.urlretrieve (sUrl, sFile)
 
 
     def login(self):
@@ -258,6 +272,13 @@ class XCowDesigner(XCowShared):
            }
         
     def prepare_url(self):
+        if "Design" in self.m_sUserUrl:
+            try:
+                dsnId = parse_qs(urlparse(self.m_sUserUrl).query)['DesignId'][0]
+                return (self.m_sDinamicUrl % self.m_netloc) + dsnId, False
+            except:
+                print "unknown url..."
+                return "", True
         request = self.m_oSession.get(self.m_sUserUrl)
         page = BeautifulSoup(request.text)
         lImages = page.findAll('img')
@@ -295,10 +316,12 @@ class XCowDesigner(XCowShared):
 
         import imghdr
         for imgId in lImages:
+            if not imgId:
+                continue
             sFile = imgId
+            print "d: " + sFile
             sUrl = (self.m_sImageUrl % sCacheServer) + sFile + "-0-0-1"
             sExt = ".jpg"
-            print "d: " + sFile
             rImg = self.m_oSession.get(sUrl, headers=self.m_dHeaders, stream=True)
             # print rImg.headers # siempre manda que es jpeg, no valen de nada las cabeceras...
             fData = rImg.raw.read()
@@ -317,7 +340,7 @@ class XCowDesigner(XCowShared):
 
 if __name__ == '__main__':
     parser = optparse.OptionParser(usage='%prog [options] <url> ',
-                               version='0.6',)
+                               version='0.7',)
     install_opts  = optparse.OptionGroup( parser, 'Download Options',
                                           'These options control downloads.', )
     
