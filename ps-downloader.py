@@ -79,7 +79,7 @@ class webpnp:
     
     def clean_filename(self, value):
         for c in '\/:*?"<>|':
-            value = value.replace(c,'')
+            value = value.replace(c,'-')
         return value.encode('ascii',errors='ignore') # force remove special chars
 
     def log_file(self, p_sFile, p_sTxt):
@@ -247,6 +247,12 @@ class XCowShared(webpnp):
                     sFile = self.clean_filename(lImgData[1])
                     print "d: " + sFile + " (cleaned filename)"
                     urllib.urlretrieve (sUrl, sFile)
+                except UnicodeEncodeError:
+                    try:
+                        print "d: " + sFile.encode('utf-8',errors='ignore') + " (utf8)"
+                    except:
+                        print "d: " + sFile.encode('latin-1',errors='ignore') + " (latin-1)"
+
 
 
     def login(self):
@@ -340,7 +346,7 @@ class XCowDesigner(XCowShared):
 
 if __name__ == '__main__':
     parser = optparse.OptionParser(usage='%prog [options] <url> ',
-                               version='0.7',)
+                               version='0.7a',)
     install_opts  = optparse.OptionGroup( parser, 'Download Options',
                                           'These options control downloads.', )
     
