@@ -23,9 +23,11 @@ with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
-import sys, urllib, optparse
+import os, sys, urllib, optparse
 from BeautifulSoup import BeautifulSoup, CData
 from urlparse import urlparse, parse_qs
+
+__VERSION__ = '0.8'
 
 
 """ fix ssl v1 problems - force TLSv1 """
@@ -54,6 +56,7 @@ class webpnp:
         self.m_sFilenameCustom = lOptions.filename
         self.m_sUserUrl = p_sUrl
         self.m_needUser = False
+        self.m_oForce = lOptions.force
         self.m_netloc = urlparse(p_sUrl).netloc[4:] # allow ps.de/.es/.com ...
         
         import requests
@@ -86,6 +89,17 @@ class webpnp:
         with open(p_sFile, 'w') as file_:
             file_.write(p_sTxt)
             file_.close()
+
+    def exist_file(self, p_sFile):
+        if self.m_oForce:
+            return False
+        try:
+            if os.stat(p_sFile).st_size > 0:
+               return True
+            else:
+               return False
+        except OSError:
+            return False
 
     def setup(self):
         pass
@@ -138,12 +152,15 @@ class PrinterStudio(webpnp):
         for img in oImgs:
             sFile = img['ID'] + "." + img['Exp']
             sUrl = img['Path'] + "/" + sFile
-            print "d: " + sFile
+            print "d: ", sFile,
             if self.m_sFilenameCustom:
                 sFile = self.m_sFilenameCustom + "_" + "{0:04d}".format(iCounter) + "." + img['Exp']
                 iCounter += 1
-                
-            urllib.urlretrieve (sUrl, sFile)
+            if not self.exist_file(sFile):
+                urllib.urlretrieve (sUrl, sFile)
+                print " OK!"
+            else:
+                print " IGN!"
         return True
 
     """ download images """
@@ -362,7 +379,7 @@ class XCowDesigner(XCowShared):
 
 if __name__ == '__main__':
     parser = optparse.OptionParser(usage='%prog [options] <url> ',
-                               version='0.8',)
+                               version=__VERSION__,)
     install_opts  = optparse.OptionGroup( parser, 'Download Options',
                                           'These options control downloads.', )
     
@@ -375,6 +392,9 @@ if __name__ == '__main__':
     
     install_opts.add_option('--password', action='store', default=False,
                         help='your site password.')
+    
+    install_opts.add_option('--force', action='store_true', dest="force",
+                        help='force download all files and overwrite.')
     
     
     parser.add_option_group(install_opts)
