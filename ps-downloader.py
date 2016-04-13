@@ -108,7 +108,8 @@ class PrinterStudio(webpnp):
         self.m_needUser = False
         self.m_sLoginUrl = "https://secure.%s/login.aspx"
         self.m_sEditUrl = "http://www.%s/products/pro_project_edit.aspx"
-        self.m_sDinamicUrl = "http://www.%s/products/playingcard/design/dn_playingcards_front_dynamic.aspx?"
+        self.m_sDinamicUrl = "http://www.%s/products/playingcard/design/dn_playingcards_%s_dynamic.aspx"
+        self.m_sSSID = ''
         self.m_dPayload = {
             '__EVENTTARGET' : 'btn_submit',
             '__EVENTARGUMENT' : '',
@@ -118,10 +119,8 @@ class PrinterStudio(webpnp):
             'btn_submit' : 'Login',
         }
 
-   
     """     download images using final url    """
-    def download(self, p_sURL):
-        print "Downloading images..."
+    def download_design (self, p_sURL):
         #print p_oLogged.cookies.get_dict()
         request = self.m_oSession.get(p_sURL, headers=self.m_dHeaders)
         page = BeautifulSoup(request.text)
@@ -133,7 +132,7 @@ class PrinterStudio(webpnp):
             print "ERROR! Can not enter in: " + p_sURL
             print " "
             print " Try to logged in PS and retry again..."
-            return
+            raise
 
         iCounter = 0
         for img in oImgs:
@@ -147,17 +146,28 @@ class PrinterStudio(webpnp):
             urllib.urlretrieve (sUrl, sFile)
 
 
+    """ download images """
+    def download(self, p_sURL):
+        print "Downloading front images..."
+        self.download_design(p_sURL)
+        sUrl = self.m_sDinamicUrl % (self.m_netloc, "back")
+
+        print "Downloading back images..."
+        self.download_design(sUrl + "?ssid=" + self.m_sSSID)
+    
     """     from user URL to internal URL    """
     def prepare_url(self):
         oUrl = urlparse(self.m_sUserUrl)
         oQuery = parse_qs(oUrl.query)
+        self.m_sSSID = oQuery['ssid'][0]
         
-        if "dn_playingcards_front_dynamic" in self.m_sUserUrl:
+        if "dn_playingcards_" in self.m_sUserUrl:
             print " Warning, trying use direct url without auth, if dont work please use 'pro_project_render.aspx' LINK"
             return self.m_sUserUrl, False
 
         if "dn_show_parse" in self.m_sUserUrl:
-            return (self.m_sDinamicUrl % self.m_netloc) + "id=" + oQuery['id'][0] + "&ssid=" + oQuery['ssid'][0], False
+            sUrl = self.m_sDinamicUrl % (self.m_netloc, "front")
+            return sUrl + "?id=" + oQuery['id'][0] + "&ssid=" + self.m_sSSID, False
         
         req = self.m_oSession.post(self.m_sEditUrl % self.m_netloc, data=oQuery, headers=self.m_dHeaders)
         jsval = BeautifulSoup(req.text)
