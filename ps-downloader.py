@@ -109,7 +109,7 @@ class PrinterStudio(webpnp):
         self.m_sLoginUrl = "https://secure.%s/login.aspx"
         self.m_sEditUrl = "http://www.%s/products/pro_project_edit.aspx"
         self.m_sDinamicUrl = "http://www.%s/products/playingcard/design/dn_playingcards_%s_dynamic.aspx"
-        self.m_sSSID = ''
+        self.m_sSSID = None
         self.m_dPayload = {
             '__EVENTTARGET' : 'btn_submit',
             '__EVENTARGUMENT' : '',
@@ -132,7 +132,7 @@ class PrinterStudio(webpnp):
             print "ERROR! Can not enter in: " + p_sURL
             print " "
             print " Try to logged in PS and retry again..."
-            raise
+            return False
 
         iCounter = 0
         for img in oImgs:
@@ -144,22 +144,28 @@ class PrinterStudio(webpnp):
                 iCounter += 1
                 
             urllib.urlretrieve (sUrl, sFile)
-
+        return True
 
     """ download images """
     def download(self, p_sURL):
         print "Downloading front images..."
-        self.download_design(p_sURL)
-        sUrl = self.m_sDinamicUrl % (self.m_netloc, "back")
+        if not self.download_design(p_sURL):
+            return
 
-        print "Downloading back images..."
-        self.download_design(sUrl + "?ssid=" + self.m_sSSID)
+        try:
+            oUrl = urlparse(p_sURL)
+            oQuery = parse_qs(oUrl.query)
+            self.m_sSSID = oQuery['ssid'][0]
+            sUrl = self.m_sDinamicUrl % (self.m_netloc, "back")
+            print "Downloading back images..."
+            self.download_design(sUrl + "?ssid=" + str(self.m_sSSID))
+        except:
+            pass
     
     """     from user URL to internal URL    """
     def prepare_url(self):
         oUrl = urlparse(self.m_sUserUrl)
         oQuery = parse_qs(oUrl.query)
-        self.m_sSSID = oQuery['ssid'][0]
         
         if "dn_playingcards_" in self.m_sUserUrl:
             print " Warning, trying use direct url without auth, if dont work please use 'pro_project_render.aspx' LINK"
@@ -356,7 +362,7 @@ class XCowDesigner(XCowShared):
 
 if __name__ == '__main__':
     parser = optparse.OptionParser(usage='%prog [options] <url> ',
-                               version='0.7a',)
+                               version='0.8',)
     install_opts  = optparse.OptionGroup( parser, 'Download Options',
                                           'These options control downloads.', )
     
